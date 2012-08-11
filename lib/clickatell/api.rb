@@ -78,16 +78,25 @@ module Clickatell
     # Additional options:
     #    :from - the from number/name
     #    :set_mobile_originated - mobile originated flag
-    #    :client_message_id - user specified message id that can be used in place of Clickatell issued API message ID for querying message
+    #    :climsgid - user specified message id that can be used in place of Clickatell issued API message ID for querying message
     #    :concat - number of concatenations allowed. I.E. how long is a message allowed to be.
+    #    :unicode => true
     # Returns a new message ID if successful.
     def send_message(recipient, message_text, opts={})
-      valid_options = opts.only(:from, :mo, :callback, :climsgid, :concat)
-      valid_options.merge!(:req_feat => '48') if valid_options[:from]
+      valid_options = opts.only(:from, :mo, :callback, :climsgid, :concat, :unicode)
+      valid_options[:unicode] = false if valid_options[:unicode].blank?
+      req = 0
+      req += 48 if valid_options[:from]
+      req += 8 if valid_options[:unicode] == true
+      valid_options.merge!(:unicode => opts[:unicode] == true ? 1 : 0) if opts[:unicode] == true
+      valid_options.merge!(:req_feat => req.to_s) if req > 0
       valid_options.merge!(:mo => '1') if opts[:set_mobile_originated]
-      valid_options.merge!(:climsgid => opts[:client_message_id]) if opts[:client_message_id]
-      if message_text.length > 160
+      valid_options.merge!(:climsgid => opts[:climsgid]) if opts[:climsgid]
+      if valid_options[:unicode] == false && message_text.length > 160
         valid_options.merge!(:concat => (message_text.length.to_f / 160).ceil)
+      elsif valid_options[:unicode] == true && message_text.length > 70
+        valid_options.merge!(:concat => (message_text.length.to_f / 70).ceil)
+        message_text = message_text.unpack('U*').map{ |i| i.to_s(16).rjust(4, '0') }.join
       end
       recipient = recipient.join(",")if recipient.is_a?(Array)
       response = execute_command('sendmsg', 'http',
