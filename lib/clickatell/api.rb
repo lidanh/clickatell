@@ -83,24 +83,24 @@ module Clickatell
     #    :unicode => true
     # Returns a new message ID if successful.
     def send_message(recipient, message_text, opts={})
-      valid_options = opts.only(:from, :mo, :callback, :climsgid, :concat, :unicode)
-      valid_options[:unicode] = false if valid_options[:unicode].blank?
+      valid_options = opts.only(:from, :mo, :callback, :climsgid, :concat)
+      opts[:unicode] = false if opts[:unicode].blank?
       req = 0
       req += 48 if valid_options[:from]
-      req += 8 if valid_options[:unicode] == true
+      req += 8 if opts[:unicode] == true
       valid_options.merge!(:unicode => opts[:unicode] == true ? 1 : 0) if opts[:unicode] == true
       valid_options.merge!(:req_feat => req.to_s) if req > 0
       valid_options.merge!(:mo => '1') if opts[:set_mobile_originated]
       valid_options.merge!(:climsgid => opts[:climsgid]) if opts[:climsgid]
-      if valid_options[:unicode] == false && message_text.length > 160
+      if opts[:unicode] == false && message_text.length > 160
         valid_options.merge!(:concat => (message_text.length.to_f / 160).ceil)
-      elsif valid_options[:unicode] == true && message_text.length > 70
+      elsif opts[:unicode] == true && message_text.length > 70
         valid_options.merge!(:concat => (message_text.length.to_f / 70).ceil)
-        message_text = message_text.unpack('U*').map{ |i| i.to_s(16).rjust(4, '0') }.join
       end
+
       recipient = recipient.join(",")if recipient.is_a?(Array)
       response = execute_command('sendmsg', 'http',
-        {:to => recipient, :text => message_text}.merge(valid_options)
+        {:to => recipient, :text => opts[:unicode] == true ? message_text.unpack('U*').map{ |i| i.to_s(16).rjust(4, '0') }.join : message_text}.merge(valid_options)
       )
       response = parse_response(response)
       response.is_a?(Array) ? response.map { |r| r['ID'] } : response['ID']
